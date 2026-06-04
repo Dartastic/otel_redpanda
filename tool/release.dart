@@ -684,8 +684,8 @@ Never _die(String msg) {
 /// LICENSE and vice versa.
 void _assertLicensePublishToMatch() {
   final pubspec = File(_pubspecPath).readAsStringSync();
-  final m = RegExp(r'^publish_to:\s*(\S+)\s*$', multiLine: true)
-      .firstMatch(pubspec);
+  final m =
+      RegExp(r'^publish_to:\s*(\S+)\s*$', multiLine: true).firstMatch(pubspec);
   final publishTo = m?.group(1);
 
   if (!File(_licensePath).existsSync()) {
