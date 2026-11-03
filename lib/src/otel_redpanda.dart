@@ -1,11 +1,12 @@
-// Licensed under the Dartastic Pro Software License Agreement.
+// Licensed under the Apache License, Version 2.0
 // Copyright 2025-2026 Mindful Software LLC d/b/a Dartastic.io, All rights reserved.
 
-import 'package:dartastic_opentelemetry/dartastic_opentelemetry.dart';
+import 'package:dartastic_opentelemetry_api/dartastic_opentelemetry_api.dart';
 
 import 'otel_redpanda_suppression.dart';
 
 class RedpandaResult {
+  /// Creates a result.
   const RedpandaResult({
     this.clusterId,
     this.brokerAddress,
@@ -29,8 +30,13 @@ class RedpandaResult {
   final String? errorMessage;
 }
 
+/// What a traced call returned: the value for the caller plus fields
+/// recorded on the span.
 class RedpandaCallResult<T> {
+  /// Creates a call result.
   const RedpandaCallResult({required this.value, this.result});
+
+  /// The value returned to the caller.
   final T value;
   final RedpandaResult? result;
 }
@@ -38,67 +44,69 @@ class RedpandaCallResult<T> {
 Future<T> tracedRedpanda<T>({
   required String operation,
   required Future<RedpandaCallResult<T>> Function() invoke,
-  Tracer? tracer,
+  APITracer? tracer,
 }) async {
   if (redpandaInstrumentationSuppressed()) {
     final r = await invoke();
     return r.value;
   }
-  final t = tracer ?? OTel.tracerProvider().getTracer('otel_redpanda');
+  final t = tracer ?? OTelAPI.tracerProvider().getTracer('otel_redpanda');
   final span = t.startSpan('redpanda $operation', kind: SpanKind.producer);
   try {
-    span.addAttributes(
-        OTel.attributes([OTel.attributeString('messaging.system', 'kafka')]));
+    span.addAttributes(OTelAPI.attributes(
+        [OTelAPI.attributeString('messaging.system', 'kafka')]));
     final r = await invoke();
     final res = r.result;
     if (res != null) {
       if (res.clusterId != null) {
-        span.addAttributes(OTel.attributes(
-            [OTel.attributeString('redpanda.cluster.id', res.clusterId!)]));
+        span.addAttributes(OTelAPI.attributes(
+            [OTelAPI.attributeString('redpanda.cluster.id', res.clusterId!)]));
       }
       if (res.brokerAddress != null) {
-        span.addAttributes(OTel.attributes(
-            [OTel.attributeString('server.address', res.brokerAddress!)]));
+        span.addAttributes(OTelAPI.attributes(
+            [OTelAPI.attributeString('server.address', res.brokerAddress!)]));
       }
       if (res.topic != null) {
-        span.addAttributes(OTel.attributes(
-            [OTel.attributeString('messaging.destination.name', res.topic!)]));
+        span.addAttributes(OTelAPI.attributes([
+          OTelAPI.attributeString('messaging.destination.name', res.topic!)
+        ]));
       }
       if (res.partition != null) {
-        span.addAttributes(OTel.attributes([
-          OTel.attributeInt(
+        span.addAttributes(OTelAPI.attributes([
+          OTelAPI.attributeInt(
             'messaging.kafka.destination.partition',
             res.partition!,
           )
         ]));
       }
       if (res.offset != null) {
-        span.addAttributes(OTel.attributes([
-          OTel.attributeInt('messaging.kafka.message.offset', res.offset!)
+        span.addAttributes(OTelAPI.attributes([
+          OTelAPI.attributeInt('messaging.kafka.message.offset', res.offset!)
         ]));
       }
       if (res.consumerGroup != null) {
-        span.addAttributes(OTel.attributes([
-          OTel.attributeString(
+        span.addAttributes(OTelAPI.attributes([
+          OTelAPI.attributeString(
             'messaging.kafka.consumer.group',
             res.consumerGroup!,
           )
         ]));
       }
       if (res.statusCode != null) {
-        span.addAttributes(OTel.attributes(
-            [OTel.attributeInt('http.response.status_code', res.statusCode!)]));
+        span.addAttributes(OTelAPI.attributes([
+          OTelAPI.attributeInt('http.response.status_code', res.statusCode!)
+        ]));
       }
       if (res.errorCode != null) {
-        span.addAttributes(OTel.attributes(
-            [OTel.attributeString('redpanda.error.code', res.errorCode!)]));
+        span.addAttributes(OTelAPI.attributes(
+            [OTelAPI.attributeString('redpanda.error.code', res.errorCode!)]));
       }
       final fail = res.errorCode != null ||
           (res.statusCode != null && res.statusCode! >= 400);
       if (fail) {
-        span.addAttributes(OTel.attributes([
-          OTel.attributeString(
-            ErrorResource.errorType.key,
+        span.addAttributes(OTelAPI.attributes([
+          OTelAPI.attributeString(
+            ErrorAttributes.errorType.key,
             res.errorCode ?? 'redpanda.error',
           )
         ]));
